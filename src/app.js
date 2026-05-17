@@ -1,50 +1,58 @@
 import { scoreRoomFromPixels, scoreSummary } from "./roomScore.js";
 
 const photoInput = document.getElementById("photoInput");
-const preview = document.getElementById("preview");
+const previewCanvas = document.getElementById("previewCanvas");
 const scoreButton = document.getElementById("scoreButton");
 const result = document.getElementById("result");
 const scoreValue = document.getElementById("scoreValue");
 const scoreSummaryEl = document.getElementById("scoreSummary");
+const previewContext = previewCanvas.getContext("2d", { willReadFrequently: true });
 
-let imageReady = false;
-let currentPreviewUrl = null;
+const MAX_IMAGE_DIMENSION = 300;
+let selectedImageBitmap = null;
 
-photoInput.addEventListener("change", () => {
+photoInput.addEventListener("change", async () => {
   const [file] = photoInput.files || [];
-  if (currentPreviewUrl) {
-    URL.revokeObjectURL(currentPreviewUrl);
-    currentPreviewUrl = null;
-  }
+  selectedImageBitmap?.close();
+  selectedImageBitmap = null;
 
-  if (!file || !file.type.startsWith("image/") || file.type === "image/svg+xml") {
-    imageReady = false;
+  if (!file || !file.type.startsWith("image/") || file.type === "image/svg+xml" || !previewContext) {
     scoreButton.disabled = true;
-    preview.hidden = true;
+    previewCanvas.hidden = true;
     return;
   }
 
-  currentPreviewUrl = URL.createObjectURL(file);
-  preview.src = currentPreviewUrl;
-  preview.hidden = false;
-  result.hidden = true;
-  imageReady = true;
-  scoreButton.disabled = false;
+  try {
+    selectedImageBitmap = await createImageBitmap(file);
+    const previewScale = Math.min(
+      MAX_IMAGE_DIMENSION / selectedImageBitmap.width,
+      MAX_IMAGE_DIMENSION / selectedImageBitmap.height,
+      1
+    );
+    previewCanvas.width = Math.max(1, Math.floor(selectedImageBitmap.width * previewScale));
+    previewCanvas.height = Math.max(1, Math.floor(selectedImageBitmap.height * previewScale));
+    previewContext.drawImage(selectedImageBitmap, 0, 0, previewCanvas.width, previewCanvas.height);
+    previewCanvas.hidden = false;
+    result.hidden = true;
+    scoreButton.disabled = false;
+  } catch {
+    selectedImageBitmap = null;
+    scoreButton.disabled = true;
+    previewCanvas.hidden = true;
+  }
 });
 
-scoreButton.addEventListener("click", async () => {
-  if (!imageReady) return;
-  await preview.decode();
+scoreButton.addEventListener("click", () => {
+  if (!selectedImageBitmap || !previewContext) return;
 
   const canvas = document.createElement("canvas");
-  const maxDimension = 300;
-  const scale = Math.min(maxDimension / preview.naturalWidth, maxDimension / preview.naturalHeight, 1);
-  canvas.width = Math.max(1, Math.floor(preview.naturalWidth * scale));
-  canvas.height = Math.max(1, Math.floor(preview.naturalHeight * scale));
+  const scale = Math.min(MAX_IMAGE_DIMENSION / selectedImageBitmap.width, MAX_IMAGE_DIMENSION / selectedImageBitmap.height, 1);
+  canvas.width = Math.max(1, Math.floor(selectedImageBitmap.width * scale));
+  canvas.height = Math.max(1, Math.floor(selectedImageBitmap.height * scale));
 
   const context = canvas.getContext("2d", { willReadFrequently: true });
   if (!context) return;
-  context.drawImage(preview, 0, 0, canvas.width, canvas.height);
+  context.drawImage(selectedImageBitmap, 0, 0, canvas.width, canvas.height);
   const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
 
   const score = scoreRoomFromPixels(pixels);
@@ -54,7 +62,5 @@ scoreButton.addEventListener("click", async () => {
 });
 
 window.addEventListener("beforeunload", () => {
-  if (currentPreviewUrl) {
-    URL.revokeObjectURL(currentPreviewUrl);
-  }
+  selectedImageBitmap?.close();
 });

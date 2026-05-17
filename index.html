@@ -14,7 +14,7 @@
         <span>Choose Photo</span>
         <input id="photoInput" type="file" accept="image/*" capture="environment" />
       </label>
-      <img id="preview" alt="Selected room" hidden />
+      <canvas id="previewCanvas" hidden></canvas>
       <button id="scoreButton" type="button" disabled>Score Room</button>
       <section id="result" hidden>
         <h2>Score: <span id="scoreValue"></span>/100</h2>

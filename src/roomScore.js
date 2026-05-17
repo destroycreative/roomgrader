@@ -2,6 +2,11 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
+const CLUTTER_TRANSITION_THRESHOLD = 28;
+const TRANSITION_PENALTY_FACTOR = 3;
+const BRIGHTNESS_WEIGHT = 0.4;
+const ORGANIZATION_WEIGHT = 0.6;
+
 export function scoreRoomFromPixels({ width, height, data }) {
   if (!width || !height || !data?.length) {
     return 0;
@@ -16,7 +21,7 @@ export function scoreRoomFromPixels({ width, height, data }) {
     const luminance = data[i] * 0.2126 + data[i + 1] * 0.7152 + data[i + 2] * 0.0722;
     luminanceSum += luminance;
 
-    if (previous !== null && Math.abs(luminance - previous) > 28) {
+    if (previous !== null && Math.abs(luminance - previous) > CLUTTER_TRANSITION_THRESHOLD) {
       clutterTransitions += 1;
     }
     previous = luminance;
@@ -26,8 +31,8 @@ export function scoreRoomFromPixels({ width, height, data }) {
   const transitionRatio = clutterTransitions / Math.max(1, pixels - 1);
 
   const brightnessScore = clamp((avgLuminance / 255) * 100, 0, 100);
-  const organizationScore = clamp((1 - transitionRatio * 3) * 100, 0, 100);
-  const score = Math.round(brightnessScore * 0.4 + organizationScore * 0.6);
+  const organizationScore = clamp((1 - transitionRatio * TRANSITION_PENALTY_FACTOR) * 100, 0, 100);
+  const score = Math.round(brightnessScore * BRIGHTNESS_WEIGHT + organizationScore * ORGANIZATION_WEIGHT);
 
   return clamp(score, 0, 100);
 }
